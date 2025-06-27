@@ -1,43 +1,50 @@
 import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
 
-// Хранилище в памяти с автоматической очисткой
+// Хранилище в памяти
 const qrStore = new Map();
 
+// Автоочистка каждые 5 минут
 setInterval(() => {
   const now = Date.now();
   for (const [id, { expiresAt }] of qrStore.entries()) {
     if (now > expiresAt) qrStore.delete(id);
   }
-}, 300000); // Каждые 5 минут
+}, 300000);
 
 export default async function handler(req, res) {
+  // Разрешаем только POST запросы
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Только POST запросы' });
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  // Проверяем наличие текста
+  const { text } = req.body;
+  if (!text || typeof text !== 'string') {
+    return res.status(400).json({ error: 'Text parameter is required' });
   }
 
   try {
-    const { text } = req.body;
-    if (!text || typeof text !== 'string') {
-      return res.status(400).json({ error: 'Необходим текстовый параметр' });
-    }
-
-    const id = uuidv4();
+    // Генерируем QR-код
     const qrData = await QRCode.toBuffer(text);
+    const id = uuidv4();
     const expiresAt = Date.now() + 120000; // 2 минуты
 
+    // Сохраняем в хранилище
     qrStore.set(id, { qrData, expiresAt });
 
-    const baseUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}`
-      : `${req.headers['x-forwarded-proto']}://${req.headers['x-forwarded-host']}`;
+    // Формируем URL
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const qrUrl = `${protocol}://${host}/api/qr/${id}.png`;
 
     return res.status(200).json({
-      qrUrl: `${baseUrl}/api/qr/${id}.png`,
+      qrUrl,
       expiresAt: new Date(expiresAt).toISOString()
     });
   } catch (error) {
-    console.error('Ошибка генерации QR:', error);
-    return res.status(500).json({ error: 'Ошибка сервера' });
+    console.error('QR generation error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 }
