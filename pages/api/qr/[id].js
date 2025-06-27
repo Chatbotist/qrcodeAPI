@@ -6,18 +6,22 @@ export default function handler(req, res) {
   }
 
   const { id } = req.query;
+  
+  // Удаляем .png из ID если есть
+  const cleanId = id.replace(/\.png$/, '');
 
-  if (!id || !qrStorage.has(id)) {
-    return res.status(404).send('QR-код не найден');
+  if (!qrStorage.has(cleanId)) {
+    return res.status(404).send('QR code not found');
   }
 
-  const { qrData, expiresAt } = qrStorage.get(id);
+  const { qrBuffer, expiresAt } = qrStorage.get(cleanId);
 
   if (Date.now() > expiresAt) {
-    qrStorage.delete(id);
-    return res.status(410).send('QR-код больше не доступен');
+    qrStorage.delete(cleanId);
+    return res.status(410).send('QR code expired');
   }
 
   res.setHeader('Content-Type', 'image/png');
-  res.send(qrData);
+  res.setHeader('Cache-Control', 'public, max-age=60');
+  res.send(qrBuffer);
 }
