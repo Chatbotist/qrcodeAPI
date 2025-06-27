@@ -3,6 +3,6 @@ module.exports = {
     bodyParser: {
       sizeLimit: '1mb',
     },
-    responseLimit: '10mb',
+    externalResolver: true,
   },
 };
