@@ -1,16 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
 
-// Хранилище QR-кодов в памяти
 const qrStorage = new Map();
 
-// Очистка старых QR-кодов каждые 5 минут
+// Очистка старых QR-кодов
 setInterval(() => {
   const now = Date.now();
   for (const [id, { expiresAt }] of qrStorage.entries()) {
-    if (now > expiresAt) {
-      qrStorage.delete(id);
-    }
+    if (now > expiresAt) qrStorage.delete(id);
   }
 }, 300000);
 
@@ -21,26 +18,26 @@ export default async function handler(req, res) {
 
   const { text } = req.body;
   
-  if (!text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'Необходим текстовый параметр' });
+  if (!text) {
+    return res.status(400).json({ error: 'Необходим текст для QR-кода' });
   }
 
   try {
     const id = uuidv4();
-    const qrDataUrl = await QRCode.toDataURL(text);
+    const qrData = await QRCode.toBuffer(text);
     const expiresAt = Date.now() + 120000; // 2 минуты
 
-    qrStorage.set(id, { qrDataUrl, expiresAt });
+    qrStorage.set(id, { qrData, expiresAt });
 
     const baseUrl = req.headers['x-forwarded-proto'] + '://' + req.headers['x-forwarded-host'];
-    const qrUrl = `${baseUrl}/api/get-qr/${id}`;
+    const qrImageUrl = `${baseUrl}/api/qr/${id}.png`;
 
     return res.status(200).json({
-      qrUrl,
+      qrUrl: qrImageUrl,
       expiresAt: new Date(expiresAt).toISOString()
     });
   } catch (error) {
-    console.error('Ошибка генерации QR:', error);
+    console.error('Ошибка:', error);
     return res.status(500).json({ error: 'Ошибка генерации QR-кода' });
   }
 }
