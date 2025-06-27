@@ -1,11 +1,8 @@
 module.exports = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '1mb',
     },
-    responseLimit: false,
-  },
-  images: {
-    domains: [],
+    responseLimit: '10mb',
   },
 };
