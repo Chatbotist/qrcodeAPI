@@ -1,36 +1,23 @@
-import { qrStore } from '../generate-qr';
-
-export const config = {
-  api: {
-    responseLimit: false,
-  },
-};
+import { qrCodes } from '../generate-qr';
 
 export default function handler(req, res) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
-    return res.status(405).end();
-  }
-
   try {
-    const { id } = req.query;
-    const cleanId = id.replace(/\.png$/, '');
-
-    if (!qrStore.has(cleanId)) {
-      return res.status(404).send('Not found');
+    if (req.method !== 'GET') {
+      return res.status(405).end();
     }
 
-    const { qrData, expiresAt } = qrStore.get(cleanId);
+    const { id } = req.query;
+    const cleanId = id.replace('.png', '');
 
-    if (Date.now() > expiresAt) {
-      qrStore.delete(cleanId);
-      return res.status(410).send('Expired');
+    if (!qrCodes[cleanId]) {
+      return res.status(404).end();
     }
 
     res.setHeader('Content-Type', 'image/png');
-    res.send(qrData);
+    return res.send(qrCodes[cleanId]);
+
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).send('Server error');
+    console.error('QR error:', error);
+    return res.status(500).end();
   }
 }
