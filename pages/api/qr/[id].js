@@ -1,27 +1,37 @@
-import { qrStorage } from '../generate-qr';
+import { qrStore } from '../generate-qr';
+
+export const config = {
+  api: {
+    responseLimit: false, // Отключаем лимит размера ответа
+  },
+};
 
 export default function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.setHeader('Allow', ['GET']).status(405).end();
+  try {
+    if (req.method !== 'GET') {
+      return res.status(405).setHeader('Allow', 'GET').end();
+    }
+
+    const { id } = req.query;
+    const cleanId = id.replace(/\.png$/, '');
+
+    if (!qrStore.has(cleanId)) {
+      return res.status(404).send('QR-код не найден');
+    }
+
+    const { qrData, expiresAt } = qrStore.get(cleanId);
+
+    if (Date.now() > expiresAt) {
+      qrStore.delete(cleanId);
+      return res.status(410).send('QR-код устарел');
+    }
+
+    res
+      .setHeader('Content-Type', 'image/png')
+      .setHeader('Cache-Control', 'public, max-age=60')
+      .send(qrData);
+  } catch (error) {
+    console.error('Ошибка получения QR:', error);
+    res.status(500).send('Ошибка сервера');
   }
-
-  const { id } = req.query;
-  
-  // Удаляем .png из ID если есть
-  const cleanId = id.replace(/\.png$/, '');
-
-  if (!qrStorage.has(cleanId)) {
-    return res.status(404).send('QR code not found');
-  }
-
-  const { qrBuffer, expiresAt } = qrStorage.get(cleanId);
-
-  if (Date.now() > expiresAt) {
-    qrStorage.delete(cleanId);
-    return res.status(410).send('QR code expired');
-  }
-
-  res.setHeader('Content-Type', 'image/png');
-  res.setHeader('Cache-Control', 'public, max-age=60');
-  res.send(qrBuffer);
 }
